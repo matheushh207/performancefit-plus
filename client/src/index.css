@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+}
+
+:root {
+  --background: oklch(0.98 0.001 270);
+  --foreground: oklch(0.2 0.02 270);
+  --card: oklch(0.97 0.002 270);
+  --card-foreground: oklch(0.2 0.02 270);
+  --secondary: oklch(0.65 0.18 270);
+  --secondary-foreground: oklch(0.98 0.001 270);
+  --muted: oklch(0.92 0.005 270);
+  --muted-foreground: oklch(0.55 0.02 270);
+  --accent: oklch(0.62 0.22 270);
+  --accent-foreground: oklch(0.98 0.001 270);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.90 0.008 270);
+  --input: oklch(0.95 0.003 270);
+  --ring: oklch(0.62 0.22 270);
+}
+
+.dark {
+  --background: oklch(0.15 0.02 270);
+  --foreground: oklch(0.92 0.005 270);
+  --card: oklch(0.22 0.025 270);
+  --card-foreground: oklch(0.92 0.005 270);
+  --secondary: oklch(0.65 0.18 270);
+  --secondary-foreground: oklch(0.15 0.02 270);
+  --muted: oklch(0.30 0.02 270);
+  --muted-foreground: oklch(0.75 0.01 270);
+  --accent: oklch(0.70 0.20 270);
+  --accent-foreground: oklch(0.15 0.02 270);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.28 0.02 270);
+  --input: oklch(0.25 0.02 270);
+  --ring: oklch(0.70 0.20 270);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+  }
+}
+
+@layer components {
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      padding-left: 2rem;
+      padding-right: 2rem;
+      max-width: 1280px;
+    }
+  }
+}
