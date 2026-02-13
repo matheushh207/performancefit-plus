@@ -200,15 +200,64 @@ const studentsRouter = router({
           .where(inArray(meals.dietId, dietIds));
       }
 
-      // Combine diets with their meals
-      const dietsWithMeals = studentDiets.map(diet => ({
-        ...diet,
-        meals: studentMeals.filter(m => m.dietId === diet.id)
-      }));
+      // Combine diets with their meals and parse notes
+      const dietsWithMeals = studentDiets.map(diet => {
+        let dietDetails: any = {};
+        try {
+          if (diet.notes) {
+            dietDetails = JSON.parse(diet.notes);
+          }
+        } catch (e) {
+          console.error("Error parsing diet notes:", e);
+        }
+
+        const thisDietMeals = studentMeals.filter(m => m.dietId === diet.id);
+        const parsedMeals = thisDietMeals.map(meal => {
+          let foodItems: any[] = [];
+          try {
+            if (meal.notes) {
+              foodItems = JSON.parse(meal.notes);
+            }
+          } catch (e) {
+            console.error("Error parsing meal notes:", e);
+          }
+          return {
+            ...meal,
+            foodItems
+          };
+        });
+
+        return {
+          ...diet,
+          description: dietDetails.description || "",
+          totalCalories: dietDetails.totalCalories || "",
+          totalProtein: dietDetails.totalProtein || "",
+          totalCarbs: dietDetails.totalCarbs || "",
+          totalFat: dietDetails.totalFat || "",
+          meals: parsedMeals
+        };
+      });
+
+      const parsedWorkouts = studentWorkouts.map(workout => {
+        let details: any = {};
+        try {
+          if (workout.notes) {
+            details = JSON.parse(workout.notes);
+          }
+        } catch (e) {
+          console.error("Error parsing workout notes:", e);
+        }
+        return {
+          ...workout,
+          description: details.description || "",
+          duration: details.duration || "",
+          difficulty: details.difficulty || ""
+        };
+      });
 
       return {
         student,
-        workouts: studentWorkouts,
+        workouts: parsedWorkouts,
         diets: dietsWithMeals
       };
     }),
@@ -487,6 +536,156 @@ const workoutsRouter = router({
       await db.delete(workouts).where(and(
         eq(workouts.id, input.id),
         eq(workouts.professionalId, ctx.professional.professionalId)
+      ));
+      return { success: true };
+    }),
+});
+
+
+const nutritionRouter = router({
+  list: professionalProcedure.query(async ({ ctx }) => {
+    try {
+      const db = await getDb();
+      if (!db) return [];
+
+      const professionalDiets = await db
+        .select()
+        .from(diets)
+        .where(eq(diets.professionalId, ctx.professional.professionalId));
+
+      if (professionalDiets.length === 0) return [];
+
+      const dietIds = professionalDiets.map(d => d.id);
+      const dietMeals = await db
+        .select()
+        .from(meals)
+        .where(inArray(meals.dietId, dietIds));
+
+      return professionalDiets.map(diet => {
+        let dietDetails: any = {};
+        try {
+          if (diet.notes) {
+            dietDetails = JSON.parse(diet.notes);
+          }
+        } catch (e) {
+          console.error("Error parsing diet notes in list:", e);
+        }
+
+        const thisDietMeals = dietMeals.filter(m => m.dietId === diet.id);
+        const parsedMeals = thisDietMeals.map(meal => {
+          let foodItems: any[] = [];
+          let mealDescription = "";
+          try {
+            if (meal.notes) {
+              const parsed = JSON.parse(meal.notes);
+              if (Array.isArray(parsed)) {
+                foodItems = parsed;
+              } else if (typeof parsed === "object" && parsed !== null) {
+                // Se o notes for um objeto com descrição e foodItems
+                foodItems = parsed.foodItems || [];
+                mealDescription = parsed.description || "";
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing meal notes:", e);
+          }
+          return {
+            ...meal,
+            description: mealDescription,
+            foodItems
+          };
+        });
+
+        return {
+          ...diet,
+          description: dietDetails.description || "",
+          totalCalories: dietDetails.totalCalories || "0",
+          totalProtein: dietDetails.totalProtein || "0",
+          totalCarbs: dietDetails.totalCarbs || "0",
+          totalFat: dietDetails.totalFat || "0",
+          meals: parsedMeals
+        };
+      });
+    } catch (error) {
+      console.error("Error listing diets:", error);
+      return [];
+    }
+  }),
+
+  create: professionalProcedure
+    .input(z.object({
+      studentId: z.number(),
+      name: z.string(),
+      description: z.string().optional(),
+      type: z.string().optional(),
+      totalCalories: z.string().optional(),
+      totalProtein: z.string().optional(),
+      totalCarbs: z.string().optional(),
+      totalFat: z.string().optional(),
+      meals: z.array(z.object({
+        name: z.string(),
+        time: z.string().optional(),
+        description: z.string().optional(),
+        foodItems: z.array(z.any())
+      }))
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      try {
+        let dbType = "maintenance";
+        if (input.type === "emagrecimento" || input.type === "weight_loss") dbType = "weight_loss";
+        else if (input.type === "hipertrofia" || input.type === "hypertrophy") dbType = "hypertrophy";
+
+        const [result] = await db
+          .insert(diets)
+          .values({
+            studentId: input.studentId,
+            professionalId: ctx.professional.professionalId,
+            name: input.name,
+            type: dbType as any,
+            isActive: true,
+            notes: JSON.stringify({
+              description: input.description,
+              totalCalories: input.totalCalories,
+              totalProtein: input.totalProtein,
+              totalCarbs: input.totalCarbs,
+              totalFat: input.totalFat
+            })
+          });
+
+        const dietId = result.insertId;
+
+        if (input.meals && input.meals.length > 0) {
+          for (const meal of input.meals) {
+            await db.insert(meals).values({
+              dietId: dietId,
+              name: meal.name,
+              time: meal.time || "",
+              order: 0,
+              notes: JSON.stringify(meal.foodItems)
+            });
+          }
+        }
+
+        return { success: true, id: dietId };
+      } catch (error: any) {
+        console.error("Error creating diet:", error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+    }),
+
+  delete: professionalProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      await db.delete(meals).where(eq(meals.dietId, input.id));
+      await db.delete(diets).where(and(
+        eq(diets.id, input.id),
+        eq(diets.professionalId, ctx.professional.professionalId)
       ));
       return { success: true };
     }),

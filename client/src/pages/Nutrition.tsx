@@ -49,7 +49,12 @@ export default function Nutrition() {
       setFormData(prev => ({ ...prev, studentId: studentIdParam }));
       setShowForm(true);
     }
-  }, []);
+
+    const token = localStorage.getItem("professionalJwt");
+    if (!token) {
+      setLocation("/professional/login");
+    }
+  }, [setLocation]);
   const { data: students = [] } = trpc.students.list.useQuery();
   const { data: diets = [], refetch } = trpc.nutrition.list.useQuery();
 

@@ -58,7 +58,12 @@ export default function StudentPortal() {
       if (studentDiets.length > 0) {
         const activeDiet = studentDiets[studentDiets.length - 1]; // Assuming last is active/latest
         try {
-          const recipesForDiet = await getRecipesByDiet(activeDiet.type);
+          // Map DB types to Google Sheet expected types
+          let dietTypeQuery = activeDiet.type as string;
+          if (activeDiet.type === "hypertrophy") dietTypeQuery = "Hipertrofia";
+          else if (activeDiet.type === "weight_loss") dietTypeQuery = "Emagrecimento";
+
+          const recipesForDiet = await getRecipesByDiet(dietTypeQuery);
           const today = new Date();
           const dayKey = today.toISOString().slice(0, 10); // YYYY-MM-DD
           const seed = hashStringToNumber(`${studentCPF}-${dayKey}`);
@@ -139,7 +144,7 @@ export default function StudentPortal() {
                   {workout.notes && (
                     <div className="mt-4 bg-secondary/10 p-4 rounded-md">
                       <p className="text-sm font-semibold mb-2">Orientações:</p>
-                      <p className="text-sm whitespace-pre-wrap">{workout.notes}</p>
+                      <p className="text-sm whitespace-pre-wrap">{workout.description || workout.notes}</p>
                     </div>
                   )}
 
@@ -168,14 +173,44 @@ export default function StudentPortal() {
                     <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded capitalize">{diet.type}</span>
                   </div>
 
-                  {diet.notes && <p className="text-sm text-muted-foreground mb-4 italic">{diet.notes}</p>}
+                  {diet.description && <p className="text-sm text-muted-foreground mb-4 italic">{diet.description}</p>}
+
+                  <div className="grid grid-cols-4 gap-2 text-xs mb-4">
+                    <div className="text-center bg-secondary/5 p-2 rounded">
+                      <p className="font-bold">{diet.totalCalories || 0}</p>
+                      <p className="text-[10px] text-muted-foreground">Kcal</p>
+                    </div>
+                    <div className="text-center bg-secondary/5 p-2 rounded">
+                      <p className="font-bold">{diet.totalProtein || 0}g</p>
+                      <p className="text-[10px] text-muted-foreground">Prot</p>
+                    </div>
+                    <div className="text-center bg-secondary/5 p-2 rounded">
+                      <p className="font-bold">{diet.totalCarbs || 0}g</p>
+                      <p className="text-[10px] text-muted-foreground">Carb</p>
+                    </div>
+                    <div className="text-center bg-secondary/5 p-2 rounded">
+                      <p className="font-bold">{diet.totalFat || 0}g</p>
+                      <p className="text-[10px] text-muted-foreground">Gord</p>
+                    </div>
+                  </div>
 
                   {diet.meals && diet.meals.length > 0 ? (
                     <div className="grid gap-3">
                       {diet.meals.map((meal: any, mealIndex: number) => (
                         <div key={mealIndex} className="bg-secondary/10 p-3 rounded-md">
                           <h4 className="font-bold text-sm mb-1">{meal.name} {meal.time && `(${meal.time})`}</h4>
-                          {meal.notes && <p className="text-xs text-muted-foreground">{meal.notes}</p>}
+                          {meal.description && <p className="text-xs text-muted-foreground mb-2">{meal.description}</p>}
+                          {meal.foodItems && meal.foodItems.length > 0 ? (
+                            <ul className="list-disc list-inside text-xs text-muted-foreground">
+                              {meal.foodItems.map((item: any, idx: number) => (
+                                <li key={idx}>
+                                  {item.quantity}{item.unit} {item.name}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            meal.notes && !meal.notes.startsWith("[") && <p className="text-xs text-muted-foreground">{meal.notes}</p>
+                          )}
                         </div>
                       ))}
                     </div>

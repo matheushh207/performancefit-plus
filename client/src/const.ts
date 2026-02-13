@@ -8,7 +8,7 @@ export const getLoginUrl = () => {
   const state = btoa(redirectUri);
 
   if (!oauthPortalUrl || !appId) {
-    return "/dashboard"; // Fallback para desenvolvimento local
+    return "/professional/login"; // Fallback para desenvolvimento local
   }
 
   const url = new URL(`${oauthPortalUrl}/app-auth`);

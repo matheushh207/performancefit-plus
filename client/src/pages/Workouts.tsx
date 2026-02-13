@@ -50,7 +50,12 @@ export default function Workouts() {
       setFormData(prev => ({ ...prev, studentId: studentIdParam }));
       setShowForm(true);
     }
-  }, []);
+
+    const token = localStorage.getItem("professionalJwt");
+    if (!token) {
+      setLocation("/professional/login");
+    }
+  }, [setLocation]);
   const [currentExercise, setCurrentExercise] = useState<Exercise>({
     name: "",
     sets: "",
@@ -334,7 +339,7 @@ export default function Workouts() {
                     <p className="text-muted-foreground mb-3">{workout.description}</p>
                     <div className="grid gap-2 mt-4">
                       <p className="text-sm font-semibold">Exercícios:</p>
-                      {workout.exercises.map((exercise, index) => (
+                      {workout.exercises.map((exercise: any, index: number) => (
                         <div key={index} className="text-sm bg-secondary/10 p-2 rounded-md">
                           <p className="font-medium">{exercise.name}</p>
                           <p className="text-muted-foreground">{exercise.sets} séries de {exercise.reps} repetições ({exercise.equipment})</p>

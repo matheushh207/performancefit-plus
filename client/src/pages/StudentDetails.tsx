@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,13 @@ export default function StudentDetails() {
         { id: studentId },
         { enabled: !!studentId }
     );
+
+    useEffect(() => {
+        const token = localStorage.getItem("professionalJwt");
+        if (!token) {
+            setLocation("/professional/login");
+        }
+    }, [setLocation]);
 
     if (isLoading) {
         return <div className="p-8 text-center text-muted-foreground">Carregando perfil do aluno...</div>;
@@ -128,7 +136,7 @@ export default function StudentDetails() {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setLocation(`/professional/workouts?studentId=${studentId}`)}
+                                onClick={() => setLocation(`/workouts?studentId=${studentId}`)}
                             >
                                 Novo Treino
                             </Button>
@@ -162,7 +170,7 @@ export default function StudentDetails() {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setLocation(`/professional/nutrition?studentId=${studentId}`)}
+                                onClick={() => setLocation(`/nutrition?studentId=${studentId}`)}
                             >
                                 Nova Dieta
                             </Button>
