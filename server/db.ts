@@ -9,17 +9,23 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db) {
     const url = process.env.DATABASE_URL;
+
     if (!url) {
-      console.warn("[Database] DATABASE_URL is not defined in environment variables");
+      console.error("❌ [Database] CRITICAL: DATABASE_URL is not defined in environment variables!");
+      return null;
+    }
+
+    if (url.trim() === "") {
+      console.error("❌ [Database] CRITICAL: DATABASE_URL is defined but empty!");
       return null;
     }
 
     try {
-      console.log("[Database] Initializing connection...");
+      console.log("[Database] Initializing connection with URL:", url.split("@").pop()); // Log only the host part for security
       _db = drizzle(url);
-      console.log("[Database] Drizzle instance created successfully");
-    } catch (error) {
-      console.error("[Database] Failed to initialize drizzle:", error);
+      console.log("✅ [Database] Drizzle instance created successfully");
+    } catch (error: any) {
+      console.error("❌ [Database] Failed to initialize drizzle:", error.message);
       _db = null;
     }
   }

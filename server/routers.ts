@@ -13,7 +13,7 @@ const insightsRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       return await db
         .select()
         .from(insights)
@@ -91,7 +91,7 @@ const studentsRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       return await db
         .select()
         .from(students)
@@ -105,7 +105,7 @@ const studentsRouter = router({
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       const [student] = await db
         .select()
@@ -149,7 +149,7 @@ const studentsRouter = router({
     .input(z.object({ cpf: z.string() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       const [student] = await db
         .select()
@@ -168,7 +168,7 @@ const studentsRouter = router({
     .input(z.object({ cpf: z.string() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       const [student] = await db
         .select()
@@ -281,7 +281,7 @@ const studentsRouter = router({
     .mutation(async ({ input, ctx }) => {
       console.log("🚀 Tentando cadastrar ALUNO:", input.fullName);
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       try {
         const [result] = await db
@@ -323,7 +323,7 @@ const studentsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       await db
         .update(students)
@@ -347,7 +347,7 @@ const studentsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       await db
         .delete(students)
@@ -366,7 +366,7 @@ const physicalEvaluationsRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       // Fetch students for this professional first to avoid complex subqueries that might fail in some dialects
       const professionalStudents = await db
         .select({ id: students.id })
@@ -418,7 +418,7 @@ const physicalEvaluationsRouter = router({
     .mutation(async ({ input, ctx }) => {
       console.log("🚀 Tentando cadastrar AVALIAÇÃO COMPLETA:", input.studentId);
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       try {
         // Buscar dados do aluno para idade e gênero (usados na TMB)
@@ -510,7 +510,7 @@ const physicalEvaluationsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       await db.delete(physicalEvaluations).where(eq(physicalEvaluations.id, input.id));
       return { success: true };
     }),
@@ -520,7 +520,7 @@ const workoutsRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       const professionalWorkouts = await db
         .select()
@@ -575,7 +575,7 @@ const workoutsRouter = router({
     .mutation(async ({ input, ctx }) => {
       console.log("🚀 Tentando cadastrar TREINO COMPLETO:", input.name);
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       try {
         const [result] = await db
@@ -620,7 +620,7 @@ const workoutsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       await db.delete(workoutExercises).where(eq(workoutExercises.workoutId, input.id));
       await db.delete(workouts).where(and(
         eq(workouts.id, input.id),
@@ -635,7 +635,7 @@ const nutritionRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       const professionalDiets = await db
         .select()
@@ -720,7 +720,7 @@ const nutritionRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       try {
         let dbType = "maintenance";
@@ -769,7 +769,7 @@ const nutritionRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       await db.delete(meals).where(eq(meals.dietId, input.id));
       await db.delete(diets).where(and(
@@ -820,7 +820,7 @@ const professionalsRouter = router({
   list: publicProcedure.query(async () => {
     try {
       const db = await getDb();
-      if (!db) return [];
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
       return await db.select().from(professionals).where(eq(professionals.isActive, true));
     } catch (error) {
       console.error("❌ Erro ao listar profissionais:", error);
@@ -844,7 +844,7 @@ const professionalsRouter = router({
     .mutation(async ({ input }) => {
       console.log("🚀 Tentando cadastrar PROFISSIONAL:", input.email);
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       try {
         const [existing] = await db
@@ -899,7 +899,7 @@ const professionalsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB not available");
+      if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
       await db
         .update(professionals)
@@ -928,9 +928,7 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const db = await getDb();
-        if (!db) {
-          throw new Error("Database not available");
-        }
+        if (!db) throw new Error("Database connection failed. Please check your DATABASE_URL environment variable.");
 
         const [professional] = await db
           .select()
