@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, ChefHat } from "lucide-react";
+import { ArrowLeft, RefreshCw, ChefHat, FileText } from "lucide-react";
 import { useLocation } from "wouter";
 import { getAllRecipes, Recipe } from "@/lib/googleDocs"; // Importação corrigida
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function Recipes() {
   const [, setLocation] = useLocation();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   const fetchRecipes = async () => {
     setLoading(true);
@@ -139,12 +141,15 @@ export default function Recipes() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 mb-6">
                         <p className="text-xs text-muted-foreground font-semibold uppercase">Ingredientes:</p>
                         <p className="text-sm line-clamp-2 italic">{recipe.ingredientes}</p>
                       </div>
 
-                      <Button className="w-full mt-6 bg-accent text-accent-foreground hover:opacity-90">
+                      <Button
+                        className="w-full mt-auto bg-accent text-accent-foreground hover:opacity-90"
+                        onClick={() => setSelectedRecipe(recipe)}
+                      >
                         Ver Detalhes
                       </Button>
                     </Card>
@@ -152,6 +157,56 @@ export default function Recipes() {
                 </div>
               </div>
             ))}
+
+            <Dialog open={!!selectedRecipe} onOpenChange={(open) => !open && setSelectedRecipe(null)}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold">{selectedRecipe?.nome}</DialogTitle>
+                  <DialogDescription className="flex items-center gap-2">
+                    <span className="text-accent font-semibold">{selectedRecipe?.tipo}</span> • {selectedRecipe?.calorias} kcal
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-6 py-4">
+                  <div className="grid grid-cols-4 gap-4 py-4 border-y border-border">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Prot</p>
+                      <p className="font-bold text-lg">{selectedRecipe?.proteina}g</p>
+                    </div>
+                    <div className="text-center border-x border-border">
+                      <p className="text-xs text-muted-foreground uppercase">Carb</p>
+                      <p className="font-bold text-lg">{selectedRecipe?.carbs}g</p>
+                    </div>
+                    <div className="text-center border-r border-border">
+                      <p className="text-xs text-muted-foreground uppercase">Gord</p>
+                      <p className="font-bold text-lg">{selectedRecipe?.gordura}g</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Tempo/Prep</p>
+                      <p className="font-bold text-lg">{selectedRecipe?.preparo} min</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                      <ChefHat className="w-5 h-5" /> Ingredientes
+                    </h4>
+                    <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {selectedRecipe?.ingredientes}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                      <FileText className="w-5 h-5" /> Modo de Preparo
+                    </h4>
+                    <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {selectedRecipe?.modoPreparo}
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
       </div>

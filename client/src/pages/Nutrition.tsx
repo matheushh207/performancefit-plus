@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Edit2, ArrowLeft, X } from "lucide-react";
+import { Plus, Trash2, Edit2, ArrowLeft, X, FileText } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -550,7 +550,12 @@ export default function Nutrition() {
                       </div>
                     </div>
 
-                    <p className="text-sm font-semibold mb-2">Refeições:</p>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm font-semibold">Refeições e Detalhes:</p>
+                      <Button variant="ghost" size="sm" className="text-accent h-7 px-2">
+                        Ver Mais Detalhes
+                      </Button>
+                    </div>
                     <div className="grid gap-3">
                       {diet.meals.map((meal, mealIndex) => (
                         <div key={mealIndex} className="bg-secondary/10 p-3 rounded-md">
