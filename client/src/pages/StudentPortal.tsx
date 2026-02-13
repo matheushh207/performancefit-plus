@@ -7,7 +7,7 @@ import { Student } from "./Students";
 import { Workout } from "./Workouts"; // Importa a interface Workout
 import { Diet } from "./Nutrition"; // Importa a interface Diet
 import { Recipe, getRecipesByDiet } from "@/lib/googleDocs";
-
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 
 function hashStringToNumber(str: string): number {
@@ -34,6 +34,7 @@ function shuffleWithSeed<T>(array: T[], seed: number): T[] {
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
   const studentCPF = localStorage.getItem("studentCPF");
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   // Redirect if no CPF
   useEffect(() => {
@@ -233,54 +234,109 @@ export default function StudentPortal() {
               Nenhuma receita disponível no momento.
             </Card>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {dailyRecipes.map((recipe, index) => (
-                <Card key={index} className="p-6 hover:shadow-lg transition-shadow border-accent/10">
-                  <div className="flex items-center justify-between mb-4">
-                    <ChefHat size={32} className="text-accent" />
-                    <span className="text-xs font-bold uppercase tracking-wider bg-accent/10 text-accent px-2 py-1 rounded">
-                      {recipe.tipo}
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold mb-2 line-clamp-1">{recipe.nome}</h3>
-
-                  <div className="space-y-3 mb-6">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Dieta:</span>
-                      <span className="font-semibold">{recipe.dieta}</span>
+            <>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {dailyRecipes.map((recipe, index) => (
+                  <Card key={index} className="p-6 hover:shadow-lg transition-shadow border-accent/10 flex flex-col">
+                    <div className="flex items-center justify-between mb-4">
+                      <ChefHat size={32} className="text-accent" />
+                      <span className="text-xs font-bold uppercase tracking-wider bg-accent/10 text-accent px-2 py-1 rounded">
+                        {recipe.tipo}
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Calorias:</span>
-                      <span className="font-semibold text-accent">{recipe.calorias} kcal</span>
+
+                    <h3 className="text-xl font-bold mb-2 line-clamp-1">{recipe.nome}</h3>
+
+                    <div className="space-y-3 mb-6 flex-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Dieta:</span>
+                        <span className="font-semibold">{recipe.dieta}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Calorias:</span>
+                        <span className="font-semibold text-accent">{recipe.calorias} kcal</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border">
+                        <div className="text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase">Prot</p>
+                          <p className="font-bold">{recipe.proteina}g</p>
+                        </div>
+                        <div className="text-center border-x border-border">
+                          <p className="text-[10px] text-muted-foreground uppercase">Carb</p>
+                          <p className="font-bold">{recipe.carbs}g</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase">Gord</p>
+                          <p className="font-bold">{recipe.gordura}g</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border">
+
+                    <div className="space-y-2 mb-6">
+                      <p className="text-xs text-muted-foreground font-semibold uppercase">Ingredientes:</p>
+                      <p className="text-sm line-clamp-2 italic">{recipe.ingredientes}</p>
+                    </div>
+
+                    <Button
+                      className="w-full mt-auto bg-accent text-accent-foreground hover:opacity-90"
+                      onClick={() => setSelectedRecipe(recipe)}
+                    >
+                      Ver Detalhes
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+
+              <Dialog open={!!selectedRecipe} onOpenChange={(open) => !open && setSelectedRecipe(null)}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">{selectedRecipe?.nome}</DialogTitle>
+                    <DialogDescription className="flex items-center gap-2">
+                      <span className="text-accent font-semibold">{selectedRecipe?.tipo}</span> • {selectedRecipe?.calorias} kcal
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-6 py-4">
+                    <div className="grid grid-cols-4 gap-4 py-4 border-y border-border">
                       <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase">Prot</p>
-                        <p className="font-bold">{recipe.proteina}g</p>
+                        <p className="text-xs text-muted-foreground uppercase">Prot</p>
+                        <p className="font-bold text-lg">{selectedRecipe?.proteina}g</p>
                       </div>
                       <div className="text-center border-x border-border">
-                        <p className="text-[10px] text-muted-foreground uppercase">Carb</p>
-                        <p className="font-bold">{recipe.carbs}g</p>
+                        <p className="text-xs text-muted-foreground uppercase">Carb</p>
+                        <p className="font-bold text-lg">{selectedRecipe?.carbs}g</p>
+                      </div>
+                      <div className="text-center border-r border-border">
+                        <p className="text-xs text-muted-foreground uppercase">Gord</p>
+                        <p className="font-bold text-lg">{selectedRecipe?.gordura}g</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase">Gord</p>
-                        <p className="font-bold">{recipe.gordura}g</p>
+                        <p className="text-xs text-muted-foreground uppercase">Tempo/Prep</p>
+                        <p className="font-bold text-lg">{selectedRecipe?.preparo} min</p>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-semibold uppercase">Ingredientes:</p>
-                    <p className="text-sm line-clamp-2 italic">{recipe.ingredientes}</p>
-                  </div>
+                    <div>
+                      <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                        <ChefHat className="w-5 h-5" /> Ingredientes
+                      </h4>
+                      <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                        {selectedRecipe?.ingredientes}
+                      </p>
+                    </div>
 
-                  <Button className="w-full mt-6 bg-accent text-accent-foreground hover:opacity-90">
-                    Ver Detalhes
-                  </Button>
-                </Card>
-              ))}
-            </div>
+                    <div>
+                      <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                        <FileText className="w-5 h-5" /> Modo de Preparo
+                      </h4>
+                      <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                        {selectedRecipe?.modoPreparo}
+                      </p>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
 
