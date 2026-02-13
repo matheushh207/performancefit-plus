@@ -8,10 +8,11 @@ let _db: ReturnType<typeof drizzle> | null = null;
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db) {
-    const url = process.env.DATABASE_URL;
+    // Tenta DATABASE_URL (padrão) ou MYSQL_URL (comum no Railway)
+    const url = process.env.DATABASE_URL || process.env.MYSQL_URL;
 
     if (!url) {
-      const errorMsg = "DATABASE_URL is not defined in environment variables. Check Railway Variables.";
+      const errorMsg = "Variável de conexão (DATABASE_URL ou MYSQL_URL) não encontrada no serviço do BACKEND. Verifique a aba 'Variables' no Railway.";
       console.error(`❌ [Database] CRITICAL: ${errorMsg}`);
       throw new Error(errorMsg);
     }
