@@ -11,22 +11,26 @@ export async function getDb() {
     const url = process.env.DATABASE_URL;
 
     if (!url) {
-      console.error("❌ [Database] CRITICAL: DATABASE_URL is not defined in environment variables!");
-      return null;
+      const errorMsg = "DATABASE_URL is not defined in environment variables. Check Railway Variables.";
+      console.error(`❌ [Database] CRITICAL: ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
     if (url.trim() === "") {
-      console.error("❌ [Database] CRITICAL: DATABASE_URL is defined but empty!");
-      return null;
+      const errorMsg = "DATABASE_URL is defined but empty. Check Railway Variables.";
+      console.error(`❌ [Database] CRITICAL: ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
     try {
-      console.log("[Database] Initializing connection with URL:", url.split("@").pop()); // Log only the host part for security
+      console.log("[Database] Attempting to connect to host:", url.split("@").pop()?.split(":")[0]);
       _db = drizzle(url);
       console.log("✅ [Database] Drizzle instance created successfully");
     } catch (error: any) {
-      console.error("❌ [Database] Failed to initialize drizzle:", error.message);
+      const errorMsg = `Failed to initialize drizzle: ${error.message}`;
+      console.error(`❌ [Database] ${errorMsg}`);
       _db = null;
+      throw new Error(errorMsg);
     }
   }
   return _db;
