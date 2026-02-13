@@ -174,8 +174,37 @@ export const physicalEvaluations = mysqlTable(
     bodyFatPercentage: decimal("bodyFatPercentage", { precision: 5, scale: 2 }),
     leanMass: decimal("leanMass", { precision: 6, scale: 2 }),
     fatMass: decimal("fatMass", { precision: 6, scale: 2 }),
-    postureNotes: text("postureNotes"),
-    observations: text("observations"),
+
+    // Medidas Corporais
+    cintura: decimal("cintura", { precision: 5, scale: 2 }),
+    abdomen: decimal("abdomen", { precision: 5, scale: 2 }),
+    quadril: decimal("quadril", { precision: 5, scale: 2 }),
+    peitoral: decimal("peitoral", { precision: 5, scale: 2 }),
+    bracoRelaxado: decimal("bracoRelaxado", { precision: 5, scale: 2 }),
+    bracoContraido: decimal("bracoContraido", { precision: 5, scale: 2 }),
+    coxa: decimal("coxa", { precision: 5, scale: 2 }),
+    panturrilha: decimal("panturrilha", { precision: 5, scale: 2 }),
+
+    // Saúde
+    pressao: varchar("pressao", { length: 20 }),
+    frequenciaCardiaca: int("frequencia_cardiaca"),
+    lesoes: text("lesoes"),
+    medicamentos: text("medicamentos"),
+
+    // Estratégico
+    objetivo: text("objetivo"),
+    postureNotes: text("postureNotes"), // Já existia, mantido
+    observations: text("observations"), // Já existia, mantido
+
+    // Cálculos Adicionais
+    tmb: decimal("tmb", { precision: 8, scale: 2 }),
+    gastoCalorico: decimal("gastoCalorico", { precision: 8, scale: 2 }),
+    relacaoCinturaQuadril: decimal("rcq", { precision: 4, scale: 2 }),
+
+    // Fotos
+    photoBeforeUrl: text("photoBeforeUrl"),
+    photoAfterUrl: text("photoAfterUrl"),
+
     createdAt: timestamp("createdAt").defaultNow(),
   },
   (table) => ({
@@ -359,8 +388,19 @@ export const insights = mysqlTable(
   }),
 );
 
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;
 export type Professional = typeof professionals.$inferSelect;
+export type InsertProfessional = typeof professionals.$inferInsert;
 export type Student = typeof students.$inferSelect;
+export type InsertStudent = typeof students.$inferInsert;
+export type PhysicalEvaluation = typeof physicalEvaluations.$inferSelect;
+export type InsertPhysicalEvaluation = typeof physicalEvaluations.$inferInsert;
 export type Workout = typeof workouts.$inferSelect;
+export type InsertWorkout = typeof workouts.$inferInsert;
 export type Diet = typeof diets.$inferSelect;
+export type InsertDiet = typeof diets.$inferInsert;
 export type Insight = typeof insights.$inferSelect;
+export type InsertInsight = typeof insights.$inferInsert;

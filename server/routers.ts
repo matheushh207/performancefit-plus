@@ -383,17 +383,67 @@ const physicalEvaluationsRouter = router({
       weight: z.string(),
       height: z.string(),
       bodyFatPercentage: z.string(),
-      leanMass: z.string().optional(),
-      fatMass: z.string().optional(),
-      postureNotes: z.string().optional(),
-      observations: z.string().optional()
+      // Medidas
+      cintura: z.string().optional(),
+      abdomen: z.string().optional(),
+      quadril: z.string().optional(),
+      peitoral: z.string().optional(),
+      bracoRelaxado: z.string().optional(),
+      bracoContraido: z.string().optional(),
+      coxa: z.string().optional(),
+      panturrilha: z.string().optional(),
+      // Saúde
+      pressao: z.string().optional(),
+      frequenciaCardiaca: z.string().optional(),
+      lesoes: z.string().optional(),
+      medicamentos: z.string().optional(),
+      // Estratégico
+      objetivo: z.string().optional(),
+      observations: z.string().optional(),
+      photoBeforeUrl: z.string().optional(),
+      photoAfterUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      console.log("🚀 Tentando cadastrar AVALIAÇÃO:", input.studentId);
+      console.log("🚀 Tentando cadastrar AVALIAÇÃO COMPLETA:", input.studentId);
       const db = await getDb();
       if (!db) throw new Error("DB not available");
 
       try {
+        // Buscar dados do aluno para idade e gênero (usados na TMB)
+        const [student] = await db
+          .select()
+          .from(students)
+          .where(eq(students.id, input.studentId))
+          .limit(1);
+
+        const weight = parseFloat(input.weight);
+        const height = parseFloat(input.height);
+        const bf = parseFloat(input.bodyFatPercentage);
+
+        // Cálculos Básicos
+        const imc = (weight / ((height / 100) ** 2)).toFixed(2);
+        const fatMass = (weight * (bf / 100)).toFixed(2);
+        const leanMass = (weight - parseFloat(fatMass)).toFixed(2);
+
+        // Cálculos de Saúde (TMB)
+        let age = 30; // Default
+        if (student?.birthDate) {
+          const birth = new Date(student.birthDate);
+          age = new Date().getFullYear() - birth.getFullYear();
+        }
+
+        let tmb = 0;
+        if (student?.gender === "female") {
+          tmb = 10 * weight + 6.25 * height - 5 * age - 161;
+        } else {
+          tmb = 10 * weight + 6.25 * height - 5 * age + 5;
+        }
+
+        // Medidas Extras
+        const cintura = input.cintura ? parseFloat(input.cintura) : 0;
+        const quadril = input.quadril ? parseFloat(input.quadril) : 0;
+        const rcq = quadril > 0 ? (cintura / quadril).toFixed(2) : "0";
+
         const [result] = await db
           .insert(physicalEvaluations)
           .values({
@@ -401,12 +451,39 @@ const physicalEvaluationsRouter = router({
             evaluationDate: new Date(input.evaluationDate),
             weight: input.weight,
             height: input.height,
-            imc: (parseFloat(input.weight) / ((parseFloat(input.height) / 100) ** 2)).toFixed(2),
+            imc: imc,
             bodyFatPercentage: input.bodyFatPercentage,
-            leanMass: input.leanMass || null,
-            fatMass: input.fatMass || null,
-            postureNotes: input.postureNotes || "",
-            observations: input.observations || ""
+            leanMass: leanMass,
+            fatMass: fatMass,
+
+            // Medidas Corporais
+            cintura: input.cintura || null,
+            abdomen: input.abdomen || null,
+            quadril: input.quadril || null,
+            peitoral: input.peitoral || null,
+            bracoRelaxado: input.bracoRelaxado || null,
+            bracoContraido: input.bracoContraido || null,
+            coxa: input.coxa || null,
+            panturrilha: input.panturrilha || null,
+
+            // Saúde
+            pressao: input.pressao || "",
+            frequenciaCardiaca: input.frequenciaCardiaca ? parseInt(input.frequenciaCardiaca) : null,
+            lesoes: input.lesoes || "",
+            medicamentos: input.medicamentos || "",
+
+            // Estratégico
+            objetivo: input.objetivo || "",
+            observations: input.observations || "",
+
+            // Cálculos
+            tmb: tmb.toFixed(2),
+            gastoCalorico: (tmb * 1.2).toFixed(2), // Fator base
+            relacaoCinturaQuadril: rcq,
+
+            // Fotos
+            photoBeforeUrl: input.photoBeforeUrl || null,
+            photoAfterUrl: input.photoAfterUrl || null
           });
 
         console.log("✅ Avaliação cadastrada com sucesso! ID:", result.insertId);
