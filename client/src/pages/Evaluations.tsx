@@ -5,33 +5,59 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Edit2, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 
+import { trpc } from "@/lib/trpc";
+
 interface Assessment {
   id: number;
-  studentName: string;
+  studentId: number;
   weight: string;
   height: string;
-  bodyFat: string;
-  date: string;
+  bodyFatPercentage: string;
+  evaluationDate: string;
 }
 
-interface FormData {
-  studentName: string;
-  weight: string;
-  height: string;
-  bodyFat: string;
-  date: string;
-}
 
 export default function Evaluations() {
   const [, setLocation] = useLocation();
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const { data: students = [] } = trpc.students.list.useQuery();
+  const { data: assessments = [], refetch } = trpc.physicalEvaluations.list.useQuery();
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    studentName: "",
+  const [formData, setFormData] = useState<{
+    studentId: number;
+    weight: string;
+    height: string;
+    bodyFatPercentage: string;
+    evaluationDate: string;
+  }>({
+    studentId: 0,
     weight: "",
     height: "",
-    bodyFat: "",
-    date: new Date().toISOString().split('T')[0],
+    bodyFatPercentage: "",
+    evaluationDate: new Date().toISOString().split('T')[0],
+  });
+
+  const createAssessment = trpc.physicalEvaluations.create.useMutation({
+    onSuccess: () => {
+      refetch();
+      setShowForm(false);
+      setFormData({
+        studentId: 0,
+        weight: "",
+        height: "",
+        bodyFatPercentage: "",
+        evaluationDate: new Date().toISOString().split('T')[0],
+      });
+      alert("Avaliação criada com sucesso!");
+    },
+    onError: (error) => {
+      alert("Erro ao criar avaliação: " + error.message);
+    }
+  });
+
+  const deleteAssessment = trpc.physicalEvaluations.delete.useMutation({
+    onSuccess: () => {
+      refetch();
+    }
   });
 
   const calculateIMC = (weight: string, height: string) => {
@@ -44,25 +70,28 @@ export default function Evaluations() {
   };
 
   const handleAddAssessment = () => {
-    if (formData.studentName && formData.weight && formData.height) {
-      const newAssessment: Assessment = {
-        id: Date.now(),
-        ...formData,
-      };
-      setAssessments([...assessments, newAssessment]);
-      setFormData({
-        studentName: "",
-        weight: "",
-        height: "",
-        bodyFat: "",
-        date: new Date().toISOString().split('T')[0],
+    if (formData.studentId && formData.weight && formData.height) {
+      createAssessment.mutate({
+        studentId: formData.studentId,
+        weight: formData.weight,
+        height: formData.height,
+        bodyFatPercentage: formData.bodyFatPercentage,
+        evaluationDate: formData.evaluationDate
       });
-      setShowForm(false);
+    } else {
+      alert("Preencha todos os campos obrigatórios");
     }
   };
 
   const handleDeleteAssessment = (id: number) => {
-    setAssessments(assessments.filter((a) => a.id !== id));
+    if (confirm("Tem certeza que deseja excluir esta avaliação?")) {
+      deleteAssessment.mutate({ id });
+    }
+  };
+
+  const getStudentName = (id: number) => {
+    const s = students.find(st => st.id === id);
+    return s ? s.fullName : "Desconhecido";
   };
 
   return (
@@ -106,19 +135,23 @@ export default function Evaluations() {
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="text-sm font-semibold mb-2 block">Nome do Aluno</label>
-                <Input
-                  type="text"
-                  placeholder="João Silva"
-                  value={formData.studentName}
-                  onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                />
+                <select
+                  value={formData.studentId}
+                  onChange={(e) => setFormData({ ...formData, studentId: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background"
+                >
+                  <option value={0}>Selecione um aluno...</option>
+                  {students.map(student => (
+                    <option key={student.id} value={student.id}>{student.fullName} (CPF: {student.cpf})</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-sm font-semibold mb-2 block">Data</label>
                 <Input
                   type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  value={formData.evaluationDate}
+                  onChange={(e) => setFormData({ ...formData, evaluationDate: e.target.value })}
                 />
               </div>
               <div>
@@ -144,8 +177,8 @@ export default function Evaluations() {
                 <Input
                   type="number"
                   placeholder="20"
-                  value={formData.bodyFat}
-                  onChange={(e) => setFormData({ ...formData, bodyFat: e.target.value })}
+                  value={formData.bodyFatPercentage}
+                  onChange={(e) => setFormData({ ...formData, bodyFatPercentage: e.target.value })}
                 />
               </div>
             </div>
@@ -178,12 +211,12 @@ export default function Evaluations() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {assessments.map((item) => (
+            {assessments.map((item: any) => (
               <Card key={item.id} className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold mb-2">{item.studentName}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">{new Date(item.date).toLocaleDateString('pt-BR')}</p>
+                    <h3 className="text-xl font-bold mb-2">{getStudentName(item.studentId)}</h3>
+                    <p className="text-sm text-muted-foreground mb-3">{new Date(item.evaluationDate).toLocaleDateString('pt-BR')}</p>
                     <div className="grid md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground">Peso</p>
@@ -195,7 +228,7 @@ export default function Evaluations() {
                       </div>
                       <div>
                         <p className="text-muted-foreground">% Gordura</p>
-                        <p className="font-semibold">{item.bodyFat}%</p>
+                        <p className="font-semibold">{item.bodyFatPercentage}%</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">IMC</p>

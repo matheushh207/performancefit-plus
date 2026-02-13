@@ -8,6 +8,8 @@ import { Workout } from "./Workouts"; // Importa a interface Workout
 import { Diet } from "./Nutrition"; // Importa a interface Diet
 import { Recipe, getRecipesByDiet } from "@/lib/googleDocs";
 
+import { trpc } from "@/lib/trpc";
+
 function hashStringToNumber(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -31,69 +33,48 @@ function shuffleWithSeed<T>(array: T[], seed: number): T[] {
 
 export default function StudentPortal() {
   const [, setLocation] = useLocation();
-  const [student, setStudent] = useState<Student | null>(null);
-  const [studentWorkouts, setStudentWorkouts] = useState<Workout[]>([]);
-  const [studentDiets, setStudentDiets] = useState<Diet[]>([]);
+  const studentCPF = localStorage.getItem("studentCPF");
+
+  // Redirect if no CPF
+  useEffect(() => {
+    if (!studentCPF) {
+      setLocation("/student-access");
+    }
+  }, [studentCPF, setLocation]);
+
+  const { data, isLoading: loading } = trpc.students.getData.useQuery(
+    { cpf: studentCPF || "" },
+    { enabled: !!studentCPF }
+  );
+
+  const student = data?.student;
+  const studentWorkouts = data?.workouts || [];
+  const studentDiets = data?.diets || [];
+
   const [dailyRecipes, setDailyRecipes] = useState<Recipe[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const studentCPF = localStorage.getItem("studentCPF");
-    if (!studentCPF) {
-      setLocation("/student-access"); // Redireciona se não houver CPF logado
-      return;
-    }
-
-    const loadStudentData = async () => {
-      const savedStudents = localStorage.getItem("performancefit_students");
-      const studentsData: Student[] = savedStudents
-        ? JSON.parse(savedStudents)
-        : [];
-      const currentStudent = studentsData.find((s) => s.cpf === studentCPF);
-      setStudent(currentStudent || null);
-
-      if (currentStudent) {
-        const savedWorkouts = localStorage.getItem("performancefit_workouts");
-        const workoutsData: Workout[] = savedWorkouts
-          ? JSON.parse(savedWorkouts)
-          : [];
-        setStudentWorkouts(
-          workoutsData.filter((w) => w.studentId === currentStudent.cpf),
-        );
-
-        const savedDiets = localStorage.getItem("performancefit_diets");
-        const dietsData: Diet[] = savedDiets ? JSON.parse(savedDiets) : [];
-        const studentDietsForStudent = dietsData.filter(
-          (d) => d.studentId === currentStudent.cpf,
-        );
-        setStudentDiets(studentDietsForStudent);
-
-        const activeDiet =
-          studentDietsForStudent[studentDietsForStudent.length - 1];
-
-        if (activeDiet) {
-          try {
-            const recipesForDiet = await getRecipesByDiet(activeDiet.type);
-
-            const today = new Date();
-            const dayKey = today.toISOString().slice(0, 10); // YYYY-MM-DD
-            const seed = hashStringToNumber(`${studentCPF}-${dayKey}`);
-
-            const shuffled = shuffleWithSeed(recipesForDiet, seed);
-            setDailyRecipes(shuffled.slice(0, 5));
-          } catch (error) {
-            console.error("Erro ao carregar receitas do aluno:", error);
-            setDailyRecipes([]);
-          }
-        } else {
+    const fetchRecipes = async () => {
+      if (studentDiets.length > 0) {
+        const activeDiet = studentDiets[studentDiets.length - 1]; // Assuming last is active/latest
+        try {
+          const recipesForDiet = await getRecipesByDiet(activeDiet.type);
+          const today = new Date();
+          const dayKey = today.toISOString().slice(0, 10); // YYYY-MM-DD
+          const seed = hashStringToNumber(`${studentCPF}-${dayKey}`);
+          const shuffled = shuffleWithSeed(recipesForDiet, seed);
+          setDailyRecipes(shuffled.slice(0, 5));
+        } catch (error) {
+          console.error("Erro ao carregar receitas do aluno:", error);
           setDailyRecipes([]);
         }
       }
-      setLoading(false);
     };
 
-    loadStudentData();
-  }, [setLocation]);
+    if (studentDiets.length > 0 && studentCPF) { // Ensure studentCPF is available for seed
+      fetchRecipes();
+    }
+  }, [studentDiets, studentCPF]);
 
   const handleLogout = () => {
     localStorage.removeItem("studentCPF");
@@ -125,7 +106,7 @@ export default function StudentPortal() {
       <div className="bg-gradient-to-r from-accent to-secondary text-accent-foreground p-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Olá, {student.name.split(" ")[0]}!</h1>
+            <h1 className="text-3xl font-bold">Olá, {student.fullName.split(" ")[0]}!</h1>
             <p className="text-sm opacity-90">Seu portal PerformanceFit+</p>
           </div>
           <Button
@@ -150,28 +131,20 @@ export default function StudentPortal() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {studentWorkouts.map((workout) => (
+              {studentWorkouts.map((workout: any) => (
                 <Card key={workout.id} className="p-6">
                   <h3 className="text-xl font-bold mb-2">{workout.name}</h3>
-                  <p className="text-muted-foreground mb-3">{workout.description}</p>
-                  <div className="grid gap-2 mt-4">
-                    <p className="text-sm font-semibold">Exercícios:</p>
-                    {workout.exercises.map((exercise, index) => (
-                      <div key={index} className="text-sm bg-secondary/10 p-2 rounded-md">
-                        <p className="font-medium">{exercise.name}</p>
-                        <p className="text-muted-foreground">{exercise.sets} séries de {exercise.reps} repetições ({exercise.equipment})</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm mt-4">
-                    <div>
-                      <p className="text-muted-foreground">Duração</p>
-                      <p className="font-semibold">{workout.duration} min</p>
+                  <p className="text-muted-foreground mb-3">{workout.type}</p>
+
+                  {workout.notes && (
+                    <div className="mt-4 bg-secondary/10 p-4 rounded-md">
+                      <p className="text-sm font-semibold mb-2">Orientações:</p>
+                      <p className="text-sm whitespace-pre-wrap">{workout.notes}</p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Dificuldade</p>
-                      <p className="font-semibold capitalize">{workout.difficulty}</p>
-                    </div>
+                  )}
+
+                  <div className="mt-4 text-xs text-muted-foreground">
+                    Criado em: {new Date(workout.createdAt).toLocaleDateString()}
                   </div>
                 </Card>
               ))}
@@ -188,44 +161,27 @@ export default function StudentPortal() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {studentDiets.map((diet) => (
+              {studentDiets.map((diet: any) => (
                 <Card key={diet.id} className="p-6">
                   <h3 className="text-xl font-bold mb-2">{diet.name}</h3>
-                  <p className="text-muted-foreground mb-3">{diet.description}</p>
-                  <div className="grid grid-cols-4 gap-4 text-sm mb-4 pt-4 border-t border-border">
-                    <div>
-                      <p className="text-muted-foreground">Calorias Totais</p>
-                      <p className="font-semibold">{diet.totalCalories} kcal</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Proteína Total</p>
-                      <p className="font-semibold">{diet.totalProtein}g</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Carboidrato Total</p>
-                      <p className="font-semibold">{diet.totalCarbs}g</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Gordura Total</p>
-                      <p className="font-semibold">{diet.totalFat}g</p>
-                    </div>
+                  <div className="flex gap-2 mb-4">
+                    <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded capitalize">{diet.type}</span>
                   </div>
-                  <p className="text-sm font-semibold mb-2">Refeições:</p>
-                  <div className="grid gap-3">
-                    {diet.meals.map((meal, mealIndex) => (
-                      <div key={mealIndex} className="bg-secondary/10 p-3 rounded-md">
-                        <h4 className="font-bold text-sm mb-1">{meal.name} {meal.time && `(${meal.time})`}</h4>
-                        {meal.description && <p className="text-xs text-muted-foreground mb-2">{meal.description}</p>}
-                        <ul className="list-disc list-inside text-xs text-muted-foreground">
-                          {meal.foodItems.map((item, itemIndex) => (
-                            <li key={itemIndex}>
-                              {item.quantity}{item.unit} de {item.name} ({item.calories}kcal, P:{item.protein}g, C:{item.carbs}g, G:{item.fat}g)
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
+
+                  {diet.notes && <p className="text-sm text-muted-foreground mb-4 italic">{diet.notes}</p>}
+
+                  {diet.meals && diet.meals.length > 0 ? (
+                    <div className="grid gap-3">
+                      {diet.meals.map((meal: any, mealIndex: number) => (
+                        <div key={mealIndex} className="bg-secondary/10 p-3 rounded-md">
+                          <h4 className="font-bold text-sm mb-1">{meal.name} {meal.time && `(${meal.time})`}</h4>
+                          {meal.notes && <p className="text-xs text-muted-foreground">{meal.notes}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nenhuma refeição detalhada.</p>
+                  )}
                 </Card>
               ))}
             </div>
@@ -251,9 +207,9 @@ export default function StudentPortal() {
                       {recipe.tipo}
                     </span>
                   </div>
-                  
+
                   <h3 className="text-xl font-bold mb-2 line-clamp-1">{recipe.nome}</h3>
-                  
+
                   <div className="space-y-3 mb-6">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Dieta:</span>

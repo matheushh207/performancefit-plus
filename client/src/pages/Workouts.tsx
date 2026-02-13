@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { Plus, Trash2, Edit2, ArrowLeft, X } from "lucide-react";
-import { useLocation } from "wouter";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+
 import { Student } from "./Students"; // Importa a interface Student
 
 export interface Exercise {
@@ -15,21 +20,18 @@ export interface Exercise {
 
 export interface Workout {
   id: number;
-  studentId: string; // CPF do aluno
+  studentId: string;
   name: string;
-  description: string;
-  duration: string;
-  difficulty: string;
-  exercises: Exercise[]; // Array de exercícios detalhados
+  description?: string;
+  duration?: string;
+  difficulty?: string;
+  exercises: any[]; // Using any[] to avoid strict type checking issues for now with backend response
 }
 
 export default function Workouts() {
   const [, setLocation] = useLocation();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [workouts, setWorkouts] = useState<Workout[]>(() => {
-    const saved = localStorage.getItem("performancefit_workouts");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const { data: students = [] } = trpc.students.list.useQuery();
+  const { data: workouts = [], refetch } = trpc.workouts.list.useQuery();
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Omit<Workout, 'id'>>({
     studentId: "",
@@ -39,6 +41,16 @@ export default function Workouts() {
     difficulty: "intermediario",
     exercises: [],
   });
+
+  useEffect(() => {
+    // Check for studentId query param
+    const searchParams = new URLSearchParams(window.location.search);
+    const studentIdParam = searchParams.get("studentId");
+    if (studentIdParam) {
+      setFormData(prev => ({ ...prev, studentId: studentIdParam }));
+      setShowForm(true);
+    }
+  }, []);
   const [currentExercise, setCurrentExercise] = useState<Exercise>({
     name: "",
     sets: "",
@@ -46,16 +58,30 @@ export default function Workouts() {
     equipment: "",
   });
 
-  useEffect(() => {
-    const savedStudents = localStorage.getItem("performancefit_students");
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
+  const createWorkout = trpc.workouts.create.useMutation({
+    onSuccess: () => {
+      refetch();
+      setShowForm(false);
+      setFormData({
+        studentId: "",
+        name: "",
+        description: "",
+        duration: "",
+        difficulty: "intermediario",
+        exercises: [],
+      });
+      alert("Treino criado com sucesso!");
+    },
+    onError: (error) => {
+      alert("Erro ao criar treino: " + error.message);
     }
-  }, []);
+  });
 
-  useEffect(() => {
-    localStorage.setItem("performancefit_workouts", JSON.stringify(workouts));
-  }, [workouts]);
+  const deleteWorkout = trpc.workouts.delete.useMutation({
+    onSuccess: () => {
+      refetch();
+    }
+  });
 
   const handleAddExercise = () => {
     if (currentExercise.name && currentExercise.sets && currentExercise.reps) {
@@ -81,28 +107,28 @@ export default function Workouts() {
 
   const handleAddWorkout = () => {
     if (formData.name && formData.studentId && formData.exercises.length > 0) {
-      setWorkouts([...workouts, { id: Date.now(), ...formData }]);
-      setFormData({
-        studentId: "",
-        name: "",
-        description: "",
-        duration: "",
-        difficulty: "intermediario",
-        exercises: [],
+      createWorkout.mutate({
+        studentId: Number(formData.studentId),
+        name: formData.name,
+        description: formData.description,
+        duration: formData.duration,
+        difficulty: formData.difficulty,
+        exercises: formData.exercises
       });
-      setShowForm(false);
     } else {
       alert("Por favor, preencha o nome do treino, selecione um aluno e adicione pelo menos um exercício.");
     }
   };
 
   const handleDeleteWorkout = (id: number) => {
-    setWorkouts(workouts.filter((w) => w.id !== id));
+    if (confirm("Tem certeza que deseja excluir este treino?")) {
+      deleteWorkout.mutate({ id });
+    }
   };
 
-  const getStudentName = (cpf: string) => {
-    const student = students.find(s => s.cpf === cpf);
-    return student ? student.name : "Aluno não encontrado";
+  const getStudentName = (id: number | string) => {
+    const student = students.find(s => s.id === Number(id));
+    return student ? student.fullName : "Aluno não encontrado";
   };
 
   return (
@@ -153,7 +179,7 @@ export default function Workouts() {
                 >
                   <option value="">Selecione um aluno...</option>
                   {students.map(student => (
-                    <option key={student.id} value={student.id}>{student.name} (CPF: {student.cpf})</option>
+                    <option key={student.id} value={student.id}>{student.fullName} (CPF: {student.cpf})</option>
                   ))}
                 </select>
               </div>
@@ -295,15 +321,15 @@ export default function Workouts() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {workouts.map((workout) => (
+            {workouts.map((workout: any) => (
               <Card key={workout.id} className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                       <h3 className="text-xl font-bold">{workout.name}</h3>
-                       <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
-                         {getStudentName(workout.studentId)}
-                       </span>
+                      <h3 className="text-xl font-bold">{workout.name}</h3>
+                      <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
+                        {getStudentName(workout.studentId)}
+                      </span>
                     </div>
                     <p className="text-muted-foreground mb-3">{workout.description}</p>
                     <div className="grid gap-2 mt-4">

@@ -6,8 +6,8 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, professionalProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
-import { insights, students, workouts, diets, physicalEvaluations, professionals } from "../drizzle/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { insights, students, workouts, diets, physicalEvaluations, professionals, meals, workoutExercises } from "../drizzle/schema";
+import { and, eq, sql, inArray } from "drizzle-orm";
 
 const insightsRouter = router({
   list: professionalProcedure.query(async ({ ctx }) => {
@@ -101,8 +101,127 @@ const studentsRouter = router({
     }
   }),
 
+  get: professionalProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(and(
+          eq(students.id, input.id),
+          eq(students.professionalId, ctx.professional.professionalId)
+        ))
+        .limit(1);
+
+      if (!student) {
+        throw new Error("Student not found or unauthorized");
+      }
+
+      // Fetch related data
+      const studentWorkouts = await db
+        .select()
+        .from(workouts)
+        .where(eq(workouts.studentId, student.id));
+
+      const studentDiets = await db
+        .select()
+        .from(diets)
+        .where(eq(diets.studentId, student.id));
+
+      const evaluations = await db
+        .select()
+        .from(physicalEvaluations)
+        .where(eq(physicalEvaluations.studentId, student.id))
+        .orderBy(physicalEvaluations.evaluationDate);
+
+      return {
+        student,
+        workouts: studentWorkouts,
+        diets: studentDiets,
+        evaluations
+      };
+    }),
+
+  submitAccess: publicProcedure
+    .input(z.object({ cpf: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(eq(students.cpf, input.cpf))
+        .limit(1);
+
+      if (!student) {
+        throw new Error("STUDENT_NOT_FOUND");
+      }
+
+      return student;
+    }),
+
+  getData: publicProcedure
+    .input(z.object({ cpf: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      const [student] = await db
+        .select()
+        .from(students)
+        .where(eq(students.cpf, input.cpf))
+        .limit(1);
+
+      if (!student) {
+        throw new Error("STUDENT_NOT_FOUND");
+      }
+
+      // Fetch related data
+      const studentWorkouts = await db
+        .select()
+        .from(workouts)
+        .where(eq(workouts.studentId, student.id));
+
+      const studentDiets = await db
+        .select()
+        .from(diets)
+        .where(eq(diets.studentId, student.id));
+
+      let studentMeals: any[] = [];
+      if (studentDiets.length > 0) {
+        const dietIds = studentDiets.map(d => d.id);
+        studentMeals = await db
+          .select()
+          .from(meals)
+          .where(inArray(meals.dietId, dietIds));
+      }
+
+      // Combine diets with their meals
+      const dietsWithMeals = studentDiets.map(diet => ({
+        ...diet,
+        meals: studentMeals.filter(m => m.dietId === diet.id)
+      }));
+
+      return {
+        student,
+        workouts: studentWorkouts,
+        diets: dietsWithMeals
+      };
+    }),
+
   create: professionalProcedure
-    .input(z.object({ fullName: z.string(), email: z.string().email().optional(), cpf: z.string() }))
+    .input(z.object({
+      fullName: z.string(),
+      email: z.string().email().optional().or(z.literal("")),
+      cpf: z.string(),
+      phone: z.string().optional(),
+      objective: z.string().optional(),
+      notes: z.string().optional()
+    }))
     .mutation(async ({ input, ctx }) => {
       console.log("🚀 Tentando cadastrar ALUNO:", input.fullName);
       const db = await getDb();
@@ -117,9 +236,9 @@ const studentsRouter = router({
             cpf: input.cpf,
             professionalId: ctx.professional.professionalId,
             isActive: true,
-            phone: "",
-            objective: "",
-            notes: ""
+            phone: input.phone || "",
+            objective: input.objective || "",
+            notes: input.notes || ""
           });
 
         console.log("✅ Aluno cadastrado com sucesso! ID:", result.insertId);
@@ -136,6 +255,127 @@ const studentsRouter = router({
         throw new Error(`Erro no banco (Aluno): ${error.message}`);
       }
     }),
+
+  update: professionalProcedure
+    .input(z.object({
+      id: z.number(),
+      fullName: z.string().optional(),
+      email: z.string().email().optional().or(z.literal("")),
+      phone: z.string().optional(),
+      objective: z.string().optional(),
+      notes: z.string().optional()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      await db
+        .update(students)
+        .set({
+          fullName: input.fullName,
+          email: input.email,
+          phone: input.phone,
+          objective: input.objective,
+          notes: input.notes,
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(students.id, input.id),
+          eq(students.professionalId, ctx.professional.professionalId)
+        ));
+
+      return { success: true };
+    }),
+
+  delete: professionalProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      await db
+        .delete(students)
+        .where(and(
+          eq(students.id, input.id),
+          eq(students.professionalId, ctx.professional.professionalId)
+        ));
+
+      return { success: true };
+    }),
+});
+
+
+
+const physicalEvaluationsRouter = router({
+  list: professionalProcedure.query(async ({ ctx }) => {
+    try {
+      const db = await getDb();
+      if (!db) return [];
+      return await db
+        .select()
+        .from(physicalEvaluations)
+        .where(
+          inArray(
+            physicalEvaluations.studentId,
+            db.select({ id: students.id }).from(students).where(eq(students.professionalId, ctx.professional.professionalId))
+          )
+        )
+        .orderBy(sql`${physicalEvaluations.evaluationDate} DESC`);
+    } catch (error) {
+      console.error("❌ Erro ao listar avaliações:", error);
+      return [];
+    }
+  }),
+
+  create: professionalProcedure
+    .input(z.object({
+      studentId: z.number(),
+      evaluationDate: z.string(), // ISO date string
+      weight: z.string(),
+      height: z.string(),
+      bodyFatPercentage: z.string(),
+      leanMass: z.string().optional(),
+      fatMass: z.string().optional(),
+      postureNotes: z.string().optional(),
+      observations: z.string().optional()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      console.log("🚀 Tentando cadastrar AVALIAÇÃO:", input.studentId);
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+
+      try {
+        const [result] = await db
+          .insert(physicalEvaluations)
+          .values({
+            studentId: input.studentId,
+            evaluationDate: new Date(input.evaluationDate),
+            weight: input.weight,
+            height: input.height,
+            imc: (parseFloat(input.weight) / ((parseFloat(input.height) / 100) ** 2)).toFixed(2),
+            bodyFatPercentage: input.bodyFatPercentage,
+            leanMass: input.leanMass || null,
+            fatMass: input.fatMass || null,
+            postureNotes: input.postureNotes || "",
+            observations: input.observations || ""
+          });
+
+        console.log("✅ Avaliação cadastrada com sucesso! ID:", result.insertId);
+        return { success: true, id: result.insertId };
+      } catch (error: any) {
+        console.error("❌ ERRO AO CADASTRAR AVALIAÇÃO:", error.message);
+        throw new Error(`Erro no banco (Avaliação): ${error.message}`);
+      }
+    }),
+
+  delete: professionalProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB not available");
+      await db.delete(physicalEvaluations).where(eq(physicalEvaluations.id, input.id));
+      return { success: true };
+    }),
 });
 
 const workoutsRouter = router({
@@ -143,19 +383,59 @@ const workoutsRouter = router({
     try {
       const db = await getDb();
       if (!db) return [];
-      return await db
+
+      const professionalWorkouts = await db
         .select()
         .from(workouts)
         .where(eq(workouts.professionalId, ctx.professional.professionalId));
+
+      if (professionalWorkouts.length === 0) return [];
+
+      const workoutIds = professionalWorkouts.map(w => w.id);
+      const exercises = await db
+        .select()
+        .from(workoutExercises)
+        .where(inArray(workoutExercises.workoutId, workoutIds));
+
+      return professionalWorkouts.map(workout => {
+        let details: any = {};
+        try {
+          if (workout.notes) {
+            details = JSON.parse(workout.notes);
+          }
+        } catch (e) {
+          console.error("Error parsing workout notes:", e);
+        }
+        return {
+          ...workout,
+          description: details.description || "",
+          duration: details.duration || "",
+          difficulty: details.difficulty || "",
+          exercises: exercises.filter(e => e.workoutId === workout.id)
+        };
+      });
     } catch (error) {
+      console.error("Error listing workouts:", error);
       return [];
     }
   }),
 
   create: professionalProcedure
-    .input(z.object({ studentId: z.number(), name: z.string() }))
+    .input(z.object({
+      studentId: z.number(),
+      name: z.string(),
+      description: z.string().optional(),
+      duration: z.string().optional(),
+      difficulty: z.string().optional(),
+      exercises: z.array(z.object({
+        name: z.string(),
+        sets: z.string(),
+        reps: z.string(),
+        equipment: z.string().optional()
+      }))
+    }))
     .mutation(async ({ input, ctx }) => {
-      console.log("🚀 Tentando cadastrar TREINO:", input.name);
+      console.log("🚀 Tentando cadastrar TREINO COMPLETO:", input.name);
       const db = await getDb();
       if (!db) throw new Error("DB not available");
 
@@ -166,73 +446,49 @@ const workoutsRouter = router({
             studentId: input.studentId,
             professionalId: ctx.professional.professionalId,
             name: input.name,
-            type: "hypertrophy",
+            type: "hypertrophy", // Defaulting, could be improved
             isActive: true,
-            notes: ""
+            notes: JSON.stringify({
+              description: input.description,
+              duration: input.duration,
+              difficulty: input.difficulty
+            })
           });
 
-        console.log("✅ Treino cadastrado com sucesso! ID:", result.insertId);
+        const workoutId = result.insertId;
+        console.log("✅ Treino criado, ID:", workoutId);
 
-        const [created] = await db
-          .select()
-          .from(workouts)
-          .where(eq(workouts.id, result.insertId))
-          .limit(1);
+        if (input.exercises && input.exercises.length > 0) {
+          for (const ex of input.exercises) {
+            await db.insert(workoutExercises).values({
+              workoutId: workoutId,
+              name: ex.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              equipment: ex.equipment || "",
+              order: 0
+            });
+          }
+        }
 
-        return created;
+        return { success: true, id: workoutId };
       } catch (error: any) {
         console.error("❌ ERRO AO CADASTRAR TREINO:", error.message);
         throw new Error(`Erro no banco (Treino): ${error.message}`);
       }
     }),
-});
 
-const nutritionRouter = router({
-  list: professionalProcedure.query(async ({ ctx }) => {
-    try {
-      const db = await getDb();
-      if (!db) return [];
-      return await db
-        .select()
-        .from(diets)
-        .where(eq(diets.professionalId, ctx.professional.professionalId));
-    } catch (error) {
-      return [];
-    }
-  }),
-
-  create: professionalProcedure
-    .input(z.object({ studentId: z.number(), name: z.string() }))
+  delete: professionalProcedure
+    .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      console.log("🚀 Tentando cadastrar DIETA:", input.name);
       const db = await getDb();
       if (!db) throw new Error("DB not available");
-
-      try {
-        const [result] = await db
-          .insert(diets)
-          .values({
-            studentId: input.studentId,
-            professionalId: ctx.professional.professionalId,
-            name: input.name,
-            type: "maintenance",
-            isActive: true,
-            notes: ""
-          });
-
-        console.log("✅ Dieta cadastrada com sucesso! ID:", result.insertId);
-
-        const [created] = await db
-          .select()
-          .from(diets)
-          .where(eq(diets.id, result.insertId))
-          .limit(1);
-
-        return created;
-      } catch (error: any) {
-        console.error("❌ ERRO AO CADASTRAR DIETA:", error.message);
-        throw new Error(`Erro no banco (Dieta): ${error.message}`);
-      }
+      await db.delete(workoutExercises).where(eq(workoutExercises.workoutId, input.id));
+      await db.delete(workouts).where(and(
+        eq(workouts.id, input.id),
+        eq(workouts.professionalId, ctx.professional.professionalId)
+      ));
+      return { success: true };
     }),
 });
 
@@ -438,6 +694,7 @@ export const appRouter = router({
   }),
   insights: insightsRouter,
   students: studentsRouter,
+  physicalEvaluations: physicalEvaluationsRouter,
   workouts: workoutsRouter,
   nutrition: nutritionRouter,
   dashboard: dashboardRouter,

@@ -5,25 +5,29 @@ import { Input } from "@/components/ui/input";
 import { Apple, Dumbbell, FileText } from "lucide-react";
 import { useLocation } from "wouter";
 import { Student } from "./Students"; // Importa a interface Student
+import { trpc } from "@/lib/trpc";
 
 export default function StudentAccess() {
   const [cpf, setCpf] = useState("");
   const [, setLocation] = useLocation();
-  const [students, setStudents] = useState<Student[]>([]);
+  // const [students, setStudents] = useState<Student[]>([]);
+  const checkStudent = trpc.students.submitAccess.useMutation();
 
-  useEffect(() => {
-    const savedStudents = localStorage.getItem("performancefit_students");
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
-    }
-  }, []);
+  // useEffect(() => {
+  //   const savedStudents = localStorage.getItem("performancefit_students");
+  //   if (savedStudents) {
+  //     setStudents(JSON.parse(savedStudents));
+  //   }
+  // }, []);
 
-  const handleAccess = () => {
-    const foundStudent = students.find(s => s.cpf === cpf);
-    if (foundStudent) {
+  const handleAccess = async () => {
+    if (cpf.length < 11) return;
+
+    try {
+      await checkStudent.mutateAsync({ cpf });
       localStorage.setItem("studentCPF", cpf);
       setLocation("/student-portal");
-    } else {
+    } catch (error) {
       alert("CPF não encontrado. Verifique o número e tente novamente.");
     }
   };

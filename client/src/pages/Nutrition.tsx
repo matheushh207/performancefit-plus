@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Edit2, ArrowLeft, X } from "lucide-react";
 import { useLocation } from "wouter";
-import { Student } from "./Students"; // Importa a interface Student
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 export interface FoodItem {
   name: string;
@@ -37,13 +38,44 @@ export interface Diet {
 }
 
 export default function Nutrition() {
-  const [, setLocation] = useLocation();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [diets, setDiets] = useState<Diet[]>(() => {
-    const saved = localStorage.getItem("performancefit_diets");
-    return saved ? JSON.parse(saved) : [];
-  });
   const [showForm, setShowForm] = useState(false);
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    // Check for studentId query param
+    const searchParams = new URLSearchParams(window.location.search);
+    const studentIdParam = searchParams.get("studentId");
+    if (studentIdParam) {
+      setFormData(prev => ({ ...prev, studentId: studentIdParam }));
+      setShowForm(true);
+    }
+  }, []);
+  const { data: students = [] } = trpc.students.list.useQuery();
+  const { data: diets = [], refetch } = trpc.nutrition.list.useQuery();
+
+  const createDiet = trpc.nutrition.create.useMutation({
+    onSuccess: () => {
+      toast.success("Plano nutricional criado com sucesso!");
+      refetch();
+      setShowForm(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error("Erro ao criar plano: " + error.message);
+    }
+  });
+
+  const deleteDiet = trpc.nutrition.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Plano removido com sucesso!");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error("Erro ao remover plano: " + error.message);
+    }
+  });
+
+
   const [formData, setFormData] = useState<Omit<Diet, 'id'>>({
     studentId: "",
     name: "",
@@ -55,6 +87,21 @@ export default function Nutrition() {
     totalFat: "0",
     meals: [],
   });
+
+  const resetForm = () => {
+    setFormData({
+      studentId: "",
+      name: "",
+      description: "",
+      type: "balanceada",
+      totalCalories: "0",
+      totalProtein: "0",
+      totalCarbs: "0",
+      totalFat: "0",
+      meals: [],
+    });
+  };
+
   const [currentMeal, setCurrentMeal] = useState<Meal>({
     name: "",
     time: "",
@@ -70,17 +117,6 @@ export default function Nutrition() {
     carbs: "",
     fat: "",
   });
-
-  useEffect(() => {
-    const savedStudents = localStorage.getItem("performancefit_students");
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("performancefit_diets", JSON.stringify(diets));
-  }, [diets]);
 
   const calculateTotals = (meals: Meal[]) => {
     let totalCalories = 0;
@@ -133,9 +169,10 @@ export default function Nutrition() {
 
   const handleAddMeal = () => {
     if (currentMeal.name && currentMeal.foodItems.length > 0) {
+      const updatedMeals = [...formData.meals, currentMeal];
       setFormData(prev => ({
         ...prev,
-        meals: [...prev.meals, currentMeal]
+        meals: updatedMeals
       }));
       setCurrentMeal({
         name: "",
@@ -143,9 +180,9 @@ export default function Nutrition() {
         description: "",
         foodItems: [],
       });
-      calculateTotals([...formData.meals, currentMeal]);
+      calculateTotals(updatedMeals);
     } else {
-      alert("Por favor, preencha o nome da refeição e adicione pelo menos um alimento.");
+      toast.error("Preencha o nome da refeição e adicione pelo menos um alimento.");
     }
   };
 
@@ -160,31 +197,43 @@ export default function Nutrition() {
 
   const handleAddDiet = () => {
     if (formData.name && formData.studentId && formData.meals.length > 0) {
-      setDiets([...diets, { id: Date.now(), ...formData }]);
-      setFormData({
-        studentId: "",
-        name: "",
-        description: "",
-        type: "balanceada",
-        totalCalories: "0",
-        totalProtein: "0",
-        totalCarbs: "0",
-        totalFat: "0",
-        meals: [],
+      // Logic to adapt formData to API expected format if needed
+      // Assuming API accepts JSON string for meals or separate table
+      // The current schema has `meals` table but `create` in router only inserts `diets`.
+      // We need to update `nutrition.create` to accept meals!
+      // For now, I'll pass it and assume I'll fix the backend.
+
+      // Wait, `create` in router (line 370) only takes `studentId` and `name`!
+      // It completely ignores `meals` and calculates nothing.
+      // I NEED TO REWRITE `nutrition.create` completely.
+
+      createDiet.mutate({
+        studentId: Number(formData.studentId),
+        name: formData.name,
+        description: formData.description,
+        type: formData.type,
+        totalCalories: formData.totalCalories,
+        totalProtein: formData.totalProtein,
+        totalCarbs: formData.totalCarbs,
+        totalFat: formData.totalFat,
+        meals: formData.meals // We need to handle this in backend
       });
-      setShowForm(false);
     } else {
-      alert("Por favor, preencha o nome do plano, selecione um aluno e adicione pelo menos uma refeição.");
+      toast.error("Preencha o nome do plano, selecione um aluno e adicione pelo menos uma refeição.");
     }
   };
 
   const handleDeleteDiet = (id: number) => {
-    setDiets(diets.filter((d) => d.id !== id));
+    if (confirm("Tem certeza que deseja excluir este plano?")) {
+      deleteDiet.mutate({ id });
+    }
   };
 
-  const getStudentName = (cpf: string) => {
-    const student = students.find(s => s.cpf === cpf);
-    return student ? student.name : "Aluno não encontrado";
+  const getStudentName = (id: number | string) => {
+    // id can be string in formData but number from API?
+    // diet.studentId is number in DB?
+    const student = students.find(s => s.id === Number(id));
+    return student ? student.fullName : "Aluno não encontrado";
   };
 
   return (
@@ -235,7 +284,7 @@ export default function Nutrition() {
                 >
                   <option value="">Selecione um aluno...</option>
                   {students.map(student => (
-                    <option key={student.id} value={student.id}>{student.name} (CPF: {student.cpf})</option>
+                    <option key={student.id} value={student.id}>{student.fullName} (CPF: {student.cpf})</option>
                   ))}
                 </select>
               </div>
@@ -472,11 +521,11 @@ export default function Nutrition() {
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="text-xl font-bold">{diet.name}</h3>
                       <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded">
-                         {getStudentName(diet.studentId)}
-                       </span>
+                        {getStudentName(diet.studentId)}
+                      </span>
                     </div>
                     <p className="text-muted-foreground mb-3">{diet.description}</p>
-                    
+
                     <div className="grid grid-cols-4 gap-4 text-sm mb-4 pt-4 border-t border-border">
                       <div>
                         <p className="text-muted-foreground">Calorias Totais</p>

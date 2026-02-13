@@ -226,6 +226,28 @@ export const workouts = mysqlTable(
   }),
 );
 
+export const workoutExercises = mysqlTable(
+  "workoutExercises",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    workoutId: int("workoutId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    sets: varchar("sets", { length: 50 }).notNull(),
+    reps: varchar("reps", { length: 50 }).notNull(),
+    equipment: varchar("equipment", { length: 100 }),
+    order: int("order").default(0),
+    notes: text("notes"),
+    createdAt: timestamp("createdAt").defaultNow(),
+  },
+  (table) => ({
+    workoutFk: foreignKey({
+      columns: [table.workoutId],
+      foreignColumns: [workouts.id],
+      name: "workoutExercises_workoutId_workouts_id_fk",
+    }).onDelete("cascade"),
+  }),
+);
+
 // ============ NUTRIÇÃO E DIETAS ============
 
 export const foods = mysqlTable("foods", {

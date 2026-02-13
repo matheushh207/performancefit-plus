@@ -6,12 +6,14 @@ import { useLocation } from "wouter";
 import { Student } from "./Students";
 import { Workout } from "./Workouts";
 import { Diet } from "./Nutrition";
+import { trpc } from "@/lib/trpc";
 
 export default function ProfessionalDashboard() {
   const [, setLocation] = useLocation();
-  const [students, setStudents] = useState<Student[]>([]);
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [diets, setDiets] = useState<Diet[]>([]);
+  const { data: students = [] } = trpc.students.list.useQuery();
+  const { data: workouts = [] } = trpc.workouts.list.useQuery();
+  const { data: diets = [] } = trpc.nutrition.list.useQuery();
+  const { data: stats } = trpc.dashboard.getStats.useQuery();
 
   useEffect(() => {
     const token =
@@ -21,20 +23,6 @@ export default function ProfessionalDashboard() {
       setLocation("/professional/login");
       return;
     }
-
-    // Carregar dados reais do localStorage
-    const savedStudents = localStorage.getItem("performancefit_students");
-    const studentsData: Student[] = savedStudents ? JSON.parse(savedStudents) : [];
-    setStudents(studentsData);
-
-    const savedWorkouts = localStorage.getItem("performancefit_workouts");
-    const workoutsData: Workout[] = savedWorkouts ? JSON.parse(savedWorkouts) : [];
-    setWorkouts(workoutsData);
-
-    const savedDiets = localStorage.getItem("performancefit_diets");
-    const dietsData: Diet[] = savedDiets ? JSON.parse(savedDiets) : [];
-    setDiets(dietsData);
-
   }, [setLocation]);
 
   const handleLogout = () => {
@@ -93,7 +81,7 @@ export default function ProfessionalDashboard() {
             <Zap size={36} className="text-accent" />
             <div>
               <p className="text-sm text-muted-foreground">Avaliações Realizadas</p>
-              <h2 className="text-2xl font-bold">0</h2>{/* TODO: Implementar contagem real */}
+              <h2 className="text-2xl font-bold">{stats?.insightCount ?? 0}</h2>{/* Using insightCount as proxy for alerts/evaluations for now, or just 0 if not tracked */}
             </div>
           </Card>
         </div>
@@ -157,7 +145,7 @@ export default function ProfessionalDashboard() {
               {students.slice(0, 3).map((student) => (
                 <Card key={student.id} className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="font-semibold">{student.name}</p>
+                    <p className="font-semibold">{student.fullName}</p>
                     <p className="text-sm text-muted-foreground">CPF: {student.cpf}</p>
                   </div>
                   <Button variant="ghost" size="sm" onClick={() => setLocation(`/student/${student.id}`)}>
