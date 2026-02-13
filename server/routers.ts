@@ -255,10 +255,17 @@ const studentsRouter = router({
         };
       });
 
+      const studentEvaluations = await db
+        .select()
+        .from(physicalEvaluations)
+        .where(eq(physicalEvaluations.studentId, student.id))
+        .orderBy(sql`${physicalEvaluations.evaluationDate} DESC`);
+
       return {
         student,
         workouts: parsedWorkouts,
-        diets: dietsWithMeals
+        diets: dietsWithMeals,
+        evaluations: studentEvaluations
       };
     }),
 
@@ -360,15 +367,20 @@ const physicalEvaluationsRouter = router({
     try {
       const db = await getDb();
       if (!db) return [];
+      // Fetch students for this professional first to avoid complex subqueries that might fail in some dialects
+      const professionalStudents = await db
+        .select({ id: students.id })
+        .from(students)
+        .where(eq(students.professionalId, ctx.professional.professionalId));
+
+      if (professionalStudents.length === 0) return [];
+
+      const studentIds = professionalStudents.map(s => s.id);
+
       return await db
         .select()
         .from(physicalEvaluations)
-        .where(
-          inArray(
-            physicalEvaluations.studentId,
-            db.select({ id: students.id }).from(students).where(eq(students.professionalId, ctx.professional.professionalId))
-          )
-        )
+        .where(inArray(physicalEvaluations.studentId, studentIds))
         .orderBy(sql`${physicalEvaluations.evaluationDate} DESC`);
     } catch (error) {
       console.error("❌ Erro ao listar avaliações:", error);

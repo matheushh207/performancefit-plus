@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Edit2, ArrowLeft, Camera, Activity, Heart, Target, Ruler } from "lucide-react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { supabase } from "@/lib/supebase";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export default function Evaluations() {
